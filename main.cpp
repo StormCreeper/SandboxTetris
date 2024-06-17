@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <fstream>
 
 bool DEBUG = false;
 
@@ -61,74 +62,25 @@ PieceDesc current_piece{};
 std::vector<TetrisPiece>
     pieces;
 
-void initPieces() {
-    // Square
-    TetrisPiece square(2, 2);
-    square.data[0] = true;
-    square.data[1] = true;
-    square.data[2] = true;
-    square.data[3] = true;
-    pieces.push_back(square);
+void initPieces(std::string filename) {
+    // File
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error opening file " << filename << std::endl;
+        return;
+    }
 
-    // L
-    // 1 0 0
-    // 1 1 1
-    TetrisPiece l(3, 3);
-    l.data[0] = true;
-    l.data[3] = true;
-    l.data[4] = true;
-    l.data[5] = true;
-    pieces.push_back(l);
-
-    // L mirrored
-    // 0 0 1
-    // 1 1 1
-    TetrisPiece l_m(3, 3);
-    l_m.data[2] = true;
-    l_m.data[3] = true;
-    l_m.data[4] = true;
-    l_m.data[5] = true;
-    pieces.push_back(l_m);
-
-    // Line
-    // 0 0 0 0
-    // 1 1 1 1
-    TetrisPiece line(4, 4);
-    line.data[4] = true;
-    line.data[5] = true;
-    line.data[6] = true;
-    line.data[7] = true;
-    pieces.push_back(line);
-
-    // T
-    // 0 1 0
-    // 1 1 1
-    TetrisPiece t(3, 3);
-    t.data[1] = true;
-    t.data[3] = true;
-    t.data[4] = true;
-    t.data[5] = true;
-    pieces.push_back(t);
-
-    // Z
-    // 1 1 0
-    // 0 1 1
-    TetrisPiece z(3, 3);
-    z.data[0] = true;
-    z.data[1] = true;
-    z.data[4] = true;
-    z.data[5] = true;
-    pieces.push_back(z);
-
-    // Z mirrored
-    // 0 1 1
-    // 1 1 0
-    TetrisPiece z_m(3, 3);
-    z_m.data[1] = true;
-    z_m.data[2] = true;
-    z_m.data[3] = true;
-    z_m.data[4] = true;
-    pieces.push_back(z_m);
+    while (!file.eof()) {
+        int s;
+        file >> s;
+        TetrisPiece piece(s, s);
+        for (int i = 0; i < s * s; i++) {
+            int val;
+            file >> val;
+            piece.data[i] = val;
+        }
+        pieces.push_back(piece);
+    }
 }
 
 // Rotate a square grid to the right
@@ -217,7 +169,7 @@ void update_grid() {
             }
         }
     }
-    // When the grid is updated, copy the buffer to the grid
+
     for (int y = 0; y < grid_height; y++) {
         for (int x = 0; x < grid_width; x++) {
             int i = index(x, y);
@@ -375,17 +327,23 @@ void update() {
         current_piece.y += 1;
     }
 
-    if (current_piece.x < 0) {
-        current_piece.x = 0;
-    }
-
-    if (current_piece.x + current_piece.piece.w * cell_size > grid_width) {
-        current_piece.x = grid_width - current_piece.piece.w * cell_size;
-    }
-
-    if (current_piece.y + current_piece.piece.h * cell_size > grid_height) {
-        place_piece(current_piece.x, current_piece.y, current_piece.piece, current_piece.type);
-        current_piece.piece.w = 0;
+    for (int i = 0; i < current_piece.piece.w; i++) {
+        for (int j = 0; j < current_piece.piece.h; j++) {
+            if (current_piece.piece.get(i, j)) {
+                if (current_piece.x + i * cell_size < 0) {
+                    current_piece.x = -i * cell_size;
+                }
+                if (current_piece.x + (i + 1) * cell_size >= grid_width) {
+                    current_piece.x = grid_width - (i + 1) * cell_size;
+                }
+                if (current_piece.y + (j + 1) * cell_size > grid_height) {
+                    place_piece(current_piece.x, current_piece.y, current_piece.piece, current_piece.type);
+                    current_piece.piece.w = 0;
+                    i = current_piece.piece.w;
+                    j = current_piece.piece.h;
+                }
+            }
+        }
     }
 
     {
@@ -423,7 +381,7 @@ int main(void) {
     grid_image = GenImageColor(grid_width, grid_height, BLUE);
     grid_texture = LoadTextureFromImage(grid_image);
 
-    initPieces();
+    initPieces("../pieces.txt");
     next_piece.piece = pieces[rand() % pieces.size()];
     next_piece.type = static_cast<Type>(rand() % 5 + 1);
     next_piece.rot = 0;
